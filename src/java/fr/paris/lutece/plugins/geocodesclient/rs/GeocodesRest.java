@@ -37,7 +37,6 @@ import fr.paris.lutece.plugins.geocode.v1.web.rs.dto.City;
 import fr.paris.lutece.plugins.geocode.v1.web.rs.dto.Country;
 import fr.paris.lutece.plugins.geocode.v1.web.service.GeoCodeService;
 import fr.paris.lutece.plugins.rest.service.RestConstants;
-import fr.paris.lutece.portal.service.spring.SpringContextService;
 import fr.paris.lutece.portal.service.util.AppLogService;
 import fr.paris.lutece.portal.service.util.AppPropertiesService;
 import fr.paris.lutece.util.date.DateUtil;
@@ -46,13 +45,15 @@ import fr.paris.lutece.util.json.JsonResponse;
 import fr.paris.lutece.util.json.JsonUtil;
 import org.apache.commons.lang3.StringUtils;
 
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
+import jakarta.enterprise.context.RequestScoped;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -64,29 +65,36 @@ import java.util.Locale;
 /**
  * CityRest
  */
+@RequestScoped
 @Path( RestConstants.BASE_PATH + Constants.API_PATH + Constants.VERSION_PATH )
 public class GeocodesRest
 {
     private static final int VERSION_1 = 1;
-    private static final String GEOCODE_BEAN_NAME = "geocodes.geoCodesService";
-    private static final DateFormat DEFAULT_DATEFORMAT;
     private static final int cityMinChars = AppPropertiesService.getPropertyInt( "geocodes.city.minchars", 3);
     private static final int countryMinChars = AppPropertiesService.getPropertyInt( "geocodes.country.minchars", 3);
     public static final String ERROR_DATE_RESOURCE = "The date additionalParam must be entered";
-    
+
+    @Inject
     private GeoCodeService _geoCodesService;
 
-    static
+    /**
+     * Builds a fresh date format for parsing the reference date.
+     *
+     * Created lazily per call (not in a static initializer) so the class can be loaded during
+     * server startup before the Lutece core services are ready, and to stay thread-safe
+     * ({@link DateFormat} is not). Honors the optional {@code geocodes.override.default.date.pattern}
+     * property, otherwise falls back to the core French locale format.
+     *
+     * @return a new DateFormat instance
+     */
+    private static DateFormat getDefaultDateFormat( )
     {
         final String datePatternFromProperty = AppPropertiesService.getProperty( "geocodes.override.default.date.pattern" );
         if ( StringUtils.isNotBlank( datePatternFromProperty ) )
         {
-            DEFAULT_DATEFORMAT = new SimpleDateFormat( datePatternFromProperty );
+            return new SimpleDateFormat( datePatternFromProperty );
         }
-        else
-        {
-            DEFAULT_DATEFORMAT = DateUtil.getDateFormat( Locale.FRANCE );
-        }
+        return DateUtil.getDateFormat( Locale.FRANCE );
     }
 
     /**
@@ -118,7 +126,7 @@ public class GeocodesRest
         	final Date dateref;
             try
             {
-                dateref = DEFAULT_DATEFORMAT.parse( strDateRef );
+                dateref = getDefaultDateFormat( ).parse( strDateRef );
             }
             catch( final ParseException e )
             {
@@ -130,17 +138,6 @@ public class GeocodesRest
         AppLogService.error( Constants.ERROR_NOT_FOUND_VERSION );
         return Response.status( Response.Status.NOT_FOUND )
                 .entity( JsonUtil.buildJsonResponse( new ErrorJsonResponse( Response.Status.NOT_FOUND.name( ), Constants.ERROR_NOT_FOUND_VERSION ) ) ).build( );
-    }
-
-    /**
-     * init geocode service
-     */
-    private void init( )
-    {
-        if ( _geoCodesService == null )
-        {
-            _geoCodesService = SpringContextService.getBean( GEOCODE_BEAN_NAME );
-        }
     }
 
     /**
@@ -166,7 +163,6 @@ public class GeocodesRest
         {
             try
             {
-                init( );
                 lstCities = _geoCodesService.getListCitiesByNameAndDateLike( strSearchBeginningVal, dateCity );
                 fillCitiesDisplayValues( lstCities );
             }
@@ -208,7 +204,7 @@ public class GeocodesRest
             }
             try
             {
-                dateref = DEFAULT_DATEFORMAT.parse( strDateRef );
+                dateref = getDefaultDateFormat( ).parse( strDateRef );
             }
             catch( final ParseException e )
             {
@@ -232,7 +228,6 @@ public class GeocodesRest
         City city = new City( );
         try
         {
-            init( );
             city = _geoCodesService.getCityByCodeAndDate( strCode, dateCity );
         }
         catch( Exception e )
@@ -272,7 +267,7 @@ public class GeocodesRest
         	final Date dateref;
             try
             {
-                dateref = DEFAULT_DATEFORMAT.parse( strDateRef );
+                dateref = getDefaultDateFormat( ).parse( strDateRef );
             }
             catch( final ParseException e )
             {
@@ -296,7 +291,6 @@ public class GeocodesRest
         Country country = new Country( );
         try
         {
-            init( );
             country = _geoCodesService.getCountryByCodeAndDate( strCode, dateCity );
         }
         catch( Exception e )
@@ -336,7 +330,7 @@ public class GeocodesRest
         	final Date dateref;
             try
             {
-                dateref = DEFAULT_DATEFORMAT.parse( strDateRef );
+                dateref = getDefaultDateFormat( ).parse( strDateRef );
             }
             catch( final ParseException e )
             {
@@ -366,7 +360,6 @@ public class GeocodesRest
         {
             try
             {
-                init( );
                 listCountries = _geoCodesService.getListCountryByNameAndDate( strSearchBeginningVal, dateRef );
             }
             catch( Exception e )

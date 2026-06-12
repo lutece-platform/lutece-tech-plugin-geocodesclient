@@ -31,27 +31,45 @@
  *
  * License 1.0
  */
-package fr.paris.lutece.plugins.geocodesclient.web;
+package fr.paris.lutece.plugins.geocodesclient.service;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import fr.paris.lutece.plugins.geocode.v1.web.rs.service.GeoCodeTransportRest;
+import fr.paris.lutece.plugins.geocode.v1.web.rs.service.HttpAccessTransport;
+import fr.paris.lutece.plugins.geocode.v1.web.service.GeoCodeService;
 
-import org.junit.jupiter.api.Test;
+import java.util.Optional;
 
-import fr.paris.lutece.test.LuteceTestCase;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Produces;
+import jakarta.inject.Named;
+
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
- * This is the business class test
+ * CDI producer for the GeoCodeService. Replaces the former Spring context that
+ * wired the HttpAccessTransport, the GeoCodeTransportRest and the GeoCodeService.
  */
-public class DefaultTest extends LuteceTestCase
+@ApplicationScoped
+public class GeocodesClientProducer
 {
-
     /**
-     * Default test
+     * Builds the GeoCodeService over a REST transport pointing to the configured API endpoint.
+     *
+     * @param strApiEndPointUrl
+     *            the geocodes API endpoint URL, injected from the plugin properties
+     * @return the configured GeoCodeService
      */
-    @Test
-    public void testDefault( )
+    @Produces
+    @ApplicationScoped
+    @Named( "geocodes.geoCodesService" )
+    public GeoCodeService createGeoCodeService(
+            @ConfigProperty( name = "geocodes.identitystore.ApiEndPointUrl" ) Optional<String> strApiEndPointUrl )
     {
-        assertTrue( true );
+        HttpAccessTransport transport = new HttpAccessTransport( );
+        transport.setApiEndPointUrl( strApiEndPointUrl.orElse( "" ) );
 
+        GeoCodeTransportRest transportRest = new GeoCodeTransportRest( transport );
+
+        return new GeoCodeService( transportRest );
     }
 }
